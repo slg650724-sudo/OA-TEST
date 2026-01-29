@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幸運抽籤筒 - 內部培訓/活動專用</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        body {
+            background-color: #fce7f3; /* 淺粉紅背景 */
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- 簡單的圖示組件 (SVG) ---
+        const IconSettings = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>;
+        const IconRefresh = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M3 21v-5h5"></path></svg>;
+        const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+        const IconPlay = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
+        const IconGift = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>;
+        const IconTrophy = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17"></path><path d="M14 14.66V17"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path></svg>;
+
+        // --- 主程式 ---
+        const LuckyDrawApp = () => {
+            const [mode, setMode] = useState('custom'); // 'number' or 'custom'
+            const [minNum, setMinNum] = useState(1);
+            const [maxNum, setMaxNum] = useState(35); // 預設 35 人
+            
+            // 預設名單
+            const [customListText, setCustomListText] = useState(
+                "技術客服部\n人資部\n雲端服務處\n3D列印事業部\n商品部\nOA事業部\n家具事業部\n後勤支援組"
+            );
+
+            const [candidates, setCandidates] = useState([]);
+            const [drawnHistory, setDrawnHistory] = useState([]);
+            const [currentDisplay, setCurrentDisplay] = useState("?");
+            const [isRolling, setIsRolling] = useState(false);
+            const [showSettings, setShowSettings] = useState(false);
+            const [showConfetti, setShowConfetti] = useState(false);
+
+            useEffect(() => {
+                resetPool();
+            }, [mode, minNum, maxNum, customListText]);
+
+            const resetPool = () => {
+                let newCandidates = [];
+                if (mode === 'number') {
+                    for (let i = parseInt(minNum); i <= parseInt(maxNum); i++) {
+                        newCandidates.push(i);
+                    }
+                } else {
+                    newCandidates = customListText.split('\n').filter(item => item.trim() !== '');
+                }
+                setCandidates(newCandidates);
+                setDrawnHistory([]);
+                setCurrentDisplay("?");
+                setShowConfetti(false);
+            };
+
+            const handleDraw = () => {
+                if (candidates.length === 0) return;
+                if (isRolling) return;
+
+                setIsRolling(true);
+                setShowConfetti(false);
+
+                let rollCount = 0;
+                const maxRolls = 20; 
+                const speed = 100; 
+
+                const intervalId = setInterval(() => {
+                    const randomIndex = Math.floor(Math.random() * candidates.length);
+                    setCurrentDisplay(candidates[randomIndex]);
+                    rollCount++;
+
+                    if (rollCount > maxRolls) {
+                        clearInterval(intervalId);
+                        finalizeDraw();
+                    }
+                }, speed);
+            };
+
+            const finalizeDraw = () => {
+                const winnerIndex = Math.floor(Math.random() * candidates.length);
+                const winner = candidates[winnerIndex];
+
+                setCurrentDisplay(winner);
+                setIsRolling(false);
+                setShowConfetti(true);
+
+                setDrawnHistory(prev => [winner, ...prev]);
+                setCandidates(prev => prev.filter((_, idx) => idx !== winnerIndex));
+            };
+
+            return (
+                <div className="flex flex-col items-center w-full max-w-md mx-auto bg-pink-50 p-6 rounded-3xl shadow-2xl relative border-4 border-white">
+                    
+                    {/* 煙火特效 (CSS 簡易版) */}
+                    {showConfetti && (
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none z-50 flex justify-center items-center">
+                            <div className="animate-ping absolute h-32 w-32 rounded-full bg-yellow-400 opacity-50"></div>
+                            <div className="animate-bounce absolute top-10 text-6xl">🎉</div>
+                        </div>
+                    )}
+
+                    {/* 標題區 */}
+                    <div className="w-full flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-pink-500 text-white p-2 rounded-lg shadow-md">
+                                <IconGift />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold text-pink-600 tracking-wide">幸運抽籤筒</h1>
+                                <p className="text-xs text-pink-400">期待每一個與驚喜相遇的瞬間</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setShowSettings(true)}
+                            className="p-2 bg-white hover:bg-pink-100 rounded-full text-pink-500 transition-colors shadow-sm"
+                            title="設定"
+                        >
+                            <IconSettings />
+                        </button>
+                    </div>
+
+                    {/* 主顯示畫面 */}
+                    <div className="w-full flex-1 flex flex-col items-center justify-center mb-8">
+                        <div className={`
+                            relative w-64 h-64 bg-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,72,153,0.3)] 
+                            flex items-center justify-center text-center p-4 border-4 border-pink-100
+                            transition-all duration-300
+                            ${isRolling ? 'scale-105 shadow-pink-300' : 'scale-100'}
+                        `}>
+                            <span className={`
+                                font-bold text-pink-500 break-words leading-tight
+                                ${String(currentDisplay).length > 5 ? 'text-3xl' : 'text-8xl'}
+                            `}>
+                                {currentDisplay}
+                            </span>
+                            
+                            {/* 剩餘數量標籤 */}
+                            <div className="absolute -bottom-4 bg-white px-4 py-1 rounded-full shadow-md text-sm text-pink-400 font-medium border border-pink-100">
+                                {candidates.length === 0 ? "已抽完" : `剩餘 ${candidates.length} 個`}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 操作按鈕 */}
+                    <div className="w-full grid grid-cols-4 gap-3 mb-6">
+                        <button 
+                            onClick={handleDraw}
+                            disabled={isRolling || candidates.length === 0}
+                            className={`
+                                col-span-3 py-4 rounded-2xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95
+                                ${candidates.length === 0 
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                    : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-pink-300/50 hover:to-rose-600'}
+                            `}
+                        >
+                            {isRolling ? '抽選中...' : '立即抽籤'} <IconPlay />
+                        </button>
+
+                        <button 
+                            onClick={resetPool}
+                            className="col-span-1 bg-white border-2 border-pink-100 text-pink-500 rounded-2xl flex items-center justify-center hover:bg-pink-50 transition-colors shadow-sm"
+                            title="重置"
+                        >
+                            <IconRefresh />
+                        </button>
+                    </div>
+
+                    {/* 歷史紀錄區 */}
+                    <div className="w-full bg-white/60 rounded-2xl p-4 min-h-[120px] border border-white/50">
+                        <h3 className="text-sm font-bold text-pink-800 mb-3 flex items-center gap-2">
+                            <IconTrophy /> 歷史中獎順序
+                        </h3>
+                        {drawnHistory.length === 0 ? (
+                            <p className="text-center text-gray-400 text-sm py-4">暫無紀錄...</p>
+                        ) : (
+                            <div className="flex flex-wrap gap-2 max-h-[100px] overflow-y-auto content-start">
+                                {drawnHistory.map((item, idx) => (
+                                    <span key={idx} className="bg-white border border-pink-100 px-3 py-1 rounded-full text-sm text-pink-600 shadow-sm animate-fade-in flex items-center">
+                                        <span className="text-pink-300 text-xs mr-1 font-mono">#{drawnHistory.length - idx}</span>
+                                        {item}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* --- 設定視窗 (Modal) --- */}
+                    {showSettings && (
+                        <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex flex-col p-6 rounded-3xl animate-fade-in">
+                            <div className="flex justify-between items-center mb-6 border-b pb-4 border-gray-100">
+                                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                    <span className="text-pink-500"><IconSettings /></span> 設定參數
+                                </h2>
+                                <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-gray-100 rounded-full">
+                                    <IconX />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto">
+                                {/* 模式切換 */}
+                                <div className="bg-gray-100 p-1 rounded-xl flex mb-6">
+                                    <button 
+                                        onClick={() => setMode('number')}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'number' ? 'bg-white shadow-sm text-pink-600' : 'text-gray-500'}`}
+                                    >
+                                        數字範圍
+                                    </button>
+                                    <button 
+                                        onClick={() => setMode('custom')}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'custom' ? 'bg-white shadow-sm text-pink-600' : 'text-gray-500'}`}
+                                    >
+                                        自訂名單
+                                    </button>
+                                </div>
+
+                                {/* 輸入區域 */}
+                                {mode === 'number' ? (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">最小數字</label>
+                                            <input 
+                                                type="number" 
+                                                value={minNum}
+                                                onChange={(e) => setMinNum(e.target.value)}
+                                                className="w-full p-3 rounded-xl border border-gray-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">最大數字</label>
+                                            <input 
+                                                type="number" 
+                                                value={maxNum}
+                                                onChange={(e) => setMaxNum(e.target.value)}
+                                                className="w-full p-3 rounded-xl border border-gray-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 outline-none"
+                                            />
+                                        </div>
+                                        <p className="text-sm text-gray-500 bg-blue-50 p-3 rounded-lg mt-4">
+                                            適合：尾牙號碼抽獎、分組編號抽選。
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">輸入名單 (一行一個)</label>
+                                            <textarea 
+                                                value={customListText}
+                                                onChange={(e) => setCustomListText(e.target.value)}
+                                                className="w-full h-48 p-3 rounded-xl border border-gray-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 outline-none resize-none text-gray-600"
+                                                placeholder="例如：&#10;王大明&#10;李小花&#10;陳志豪"
+                                            ></textarea>
+                                        </div>
+                                        <p className="text-sm text-gray-500 bg-blue-50 p-3 rounded-lg">
+                                            適合：客服人員點名、人資考題抽取、部門分組。
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button 
+                                onClick={() => {
+                                    resetPool();
+                                    setShowSettings(false);
+                                }}
+                                className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-pink-600 transition-colors mt-4"
+                            >
+                                儲存並重置
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<LuckyDrawApp />);
+    </script>
+</body>
+</html>
